@@ -19,25 +19,48 @@ namespace Nerdy.DAL.Repositories
 
         public async Task AddAsync(Announcement announcement)
         {
-            await _context.Announcements.AddAsync(announcement);
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.Announcements.AddAsync(announcement);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Error adding announcement", ex);
+            }
+
         }
 
         public async Task<bool> DeleteAsync(int id)
         {
-            var entity = await _context.Announcements.FindAsync(id);
-            if (entity == null) return false;
+            try
+            {
+                var entity = await _context.Announcements.FindAsync(id);
+                if (entity == null) return false;
 
-            _context.Announcements.Remove(entity);
-            await _context.SaveChangesAsync();
-            return true;
+                _context.Announcements.Remove(entity);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch (DbUpdateException ex)
+            {
+               throw new Exception("Error deleting announcement", ex);
+            }
         }
 
         public async Task<IEnumerable<Announcement>> GetAllAsync()
         {
-            return await _context.Announcements
-                .OrderByDescending(a => a.DateAdded)
-                .ToListAsync();
+            try
+            {
+                return await _context.Announcements
+                    .OrderByDescending(a => a.DateAdded)
+                    .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Error retrieving announcements", ex);
+            }
+
         }
 
         public async Task<Announcement?> GetByIdAsync(int id) => await _context.Announcements.FindAsync(id);
@@ -45,30 +68,45 @@ namespace Nerdy.DAL.Repositories
 
         public async Task<IEnumerable<Announcement>> GetSimilarAsync(Announcement target, int count = 3)
         {
-            var words = _similar.GetWords(target.Title).Union(_similar.GetWords(target.Description)).ToHashSet();
+            if (target == null) throw new ArgumentNullException(nameof(target));
 
-            var announcements = await _context.Announcements
-            .Where(a => a.Id != target.Id)
-            .ToListAsync();
+            try
+            {
+                var words = _similar.GetWords(target.Title).Union(_similar.GetWords(target.Description)).ToHashSet();
+                var announcements = await _context.Announcements.Where(a => a.Id != target.Id).ToListAsync();
 
-            return announcements
-                .Where(a => _similar.GetWords(a.Title)
-                .Union(_similar.GetWords(a.Description))
-                .Intersect(words).Any())
-                .OrderByDescending(a => a.DateAdded)
-                .Take(count);
+                return announcements
+                    .Where(a => _similar.GetWords(a.Title).Union(_similar.GetWords(a.Description)).Intersect(words).Any())
+                    .OrderByDescending(a => a.DateAdded)
+                    .Take(count);
+            }
+            catch (Exception ex)
+            {
+               throw new Exception("Error retrieving similar announcements", ex);
+            }
         }
 
         public async Task<bool> UpdateAsync(Announcement updated)
         {
-            var existing = await _context.Announcements.FindAsync(updated.Id);
+            try
+            {
+                var existing = await _context.Announcements.FindAsync(updated.Id);
 
-            if (existing == null) return false;
+                if (existing == null) return false;
 
-            existing.Title = updated.Title;
-            existing.Description = updated.Description;
-            await _context.SaveChangesAsync();
-            return true;
+                existing.Title = updated.Title;
+                existing.Description = updated.Description;
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch (DbUpdateException ex)
+            {
+                throw new Exception("Error updating announcements", ex);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Unexpected error updating announcement", ex);
+            }
         }
     }
 }
